@@ -1,0 +1,100 @@
+else if (ch == '\'') {
+                pStartCh = pCrtCh; 
+                pCrtCh++;
+                state = 14;
+                }
+                else if (ch == '"') {
+                pStartCh = pCrtCh; 
+                pCrtCh++;
+                state = 19;
+                }
+                else if (isalpha(ch) || ch == '_') {
+                pStartCh = pCrtCh; 
+                pCrtCh++;
+                state = 24; 
+                }
+                else if (ch == ',') {
+                pCrtCh++;
+                state = 26;
+                }
+                else if (ch == ';') {
+                pCrtCh++;
+                state = 27;
+                }
+                else if (ch == '(') {
+                pCrtCh++;
+                state = 28;
+                }
+                else if (ch == ')') {
+                pCrtCh++;
+                state = 29;
+                }
+                else if (ch == '[') {
+                pCrtCh++;
+                state = 30;
+                }
+                else if (ch == ']') {
+                pCrtCh++;
+                state = 31;
+                }
+                else if (ch == '{') {
+                pCrtCh++;
+                state = 32;
+                }
+                else if (ch == '}') {
+                pCrtCh++;
+                state = 33;
+                }
+                else if (ch == '/') {
+                pCrtCh++;
+                state = 36;
+                }
+                else if (ch == ' ' || ch == '\r' || ch == '\t') {
+                pCrtCh++; 
+                state = 0;
+                }
+                else if (ch == '\n') { 
+                line++;
+                pCrtCh++;
+                state = 0;
+                }
+                else if (ch == '+') {
+                pCrtCh++;
+                state = 39;
+                }
+                else if (ch == '-') {
+                pCrtCh++;
+                state = 40;
+                }
+                else if (ch == '*') {
+                pCrtCh++;
+                state = 41;
+                }
+                else if (ch == '.') {
+                pCrtCh++;
+                state = 42;
+                }
+                else if (ch == '<') {
+                pCrtCh++;
+                state = 43;
+                }
+                else if (ch == '>') {
+                pCrtCh++;
+                state = 46;
+                }
+                else if (ch == '&') {
+                pCrtCh++;
+                state = 49;
+                }
+                else if (ch == '|') {
+                pCrtCh++;
+                state = 50;
+                }
+                else if (ch == '!') {
+                pCrtCh++;
+                state = 51;
+                }
+                else if (ch == '=') {
+                pCrtCh++;
+                state = 54;
+                }
