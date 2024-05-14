@@ -35,6 +35,7 @@ typedef struct _Token {
 
 Token *lastToken, *tokens;
 Token *crtTk, *consumedTk;
+Token *startTk;
 // Function to add a new token
 Token *addTk(int code)
 {
@@ -87,7 +88,6 @@ int getNextToken() {
 
     while (1) {
         ch = *pCrtCh;
-       printf("%c",ch);
         switch (state) {
             case 0:
                if (isdigit(ch) && ch == '0') {//0
@@ -640,6 +640,706 @@ void showTokens() {
     }
 }
 
+int unit();
+int declStruct();
+int declFunc();
+int declVar();
+int typeBase();
+int arrayDecl();
+int fnDef();
+int fnParam();
+int stm();
+int stmCompound();
+int expr();
+int exprAssign();
+int exprOr();
+int exprAnd();
+int exprEq();
+int exprRel();
+int exprAdd();
+int exprMul();
+int exprCast();
+int exprUnary();
+int exprPostfix();
+int exprPrimary();
+int exprAndPrim();
+int exprOr();
+int exprOrPrim();
+
+
+
+int consume(int code)
+{
+    //printf("Sunt aici3 %d ",code);
+	if(crtTk->code == code)
+	{
+        //printf("Sunt aici4");
+		consumedTk=crtTk;
+		crtTk=crtTk->next;
+        
+		return 1;
+	}
+
+    // printf("Sunt aici5");
+return 0;
+}
+
+// handle the typeBase --> typeBase: INT | DOUBLE | CHAR | STRUCT ID ;
+
+int typeBase()
+{
+     //printf("Sunt aici5");
+	if(consume(INT) || consume(DOUBLE) || consume(CHAR) || (consume(STRUCT) && consume(ID)))
+		return 1;
+	return 0;
+}
+
+//handle the array declaration  --> arrayDecl: LBRACKET expr? RBRACKET ;
+int arrayDecl()
+{
+	if(!consume(LBRACKET))
+		return 0;
+	if(expr())
+	{
+		//it does nothing if there is or not an expr
+	}
+	if(!consume(RBRACKET))
+		tkerr(crtTk,"missing ] after when declaring the array");
+	return 0 ;
+}
+
+
+// handle a variable declaration or a multiple variables declaration 
+// declVar:  typeBase ID arrayDecl? ( COMMA ID arrayDecl? )* SEMICOLON ;
+
+int declVar()
+{
+     //printf("Sunt aiciVar");
+	if(!typeBase()) return 0;
+	if(!consume(ID)) tkerr(crtTk,"missing ID after TYPE"); 
+	if(arrayDecl())
+	{
+		//it does nothing if there is or not an array declaration
+	}
+	while(1)
+	{
+		if(!consume(COMMA))break;
+		if(!consume(ID)) tkerr(crtTk,"missing ID after COMMA"); 
+		if(arrayDecl())
+		{
+			//it does nothing if there is or not an array declaration
+		}
+	}
+	
+	if(!consume(SEMICOLON)) tkerr(crtTk,"missing ; after declaration");
+	
+	return 1;
+}
+
+// handle the declaration of a structure --> declStruct: STRUCT ID LACC declVar* RACC SEMICOLON ;
+int declStruct(){
+	
+	Token *start= crtTk;
+	if(consume(STRUCT)){
+		if(consume(ID)){
+			if(consume(LACC)){
+				while(1){
+					if(declVar()){
+						
+					}
+					else break;
+				}
+				if(consume(RACC)){
+					if(consume(SEMICOLON)){
+						return 1;
+					}
+				}
+			}
+		}
+	}
+	crtTk=start; //ne intoarcem la pozitia initiala daca vreun if nu sa indeplinit
+	return 0;
+}
+
+// handel the unit --> unit: ( declStruct | declFunc | declVar )* END ;
+
+int unit(){
+	Token *start= crtTk;
+
+    //printf("------------------------%d-----------------", start->code);
+	while(1){
+		if(declStruct()){
+						
+		}else if(declFunc()){}
+		else if(declVar()){}
+		else break;
+		
+	}
+	if(consume(END)){
+		return 1;
+	}
+	crtTk=start;
+	return 0;
+	
+}
+
+//handle the typeName --> typeName: typeBase arrayDecl? ;
+int typeName()
+{
+	if(!typeBase())return 0;
+	arrayDecl();
+	return 1;
+}
+
+//handle the funcArg --> funcArg: typeBase ID arrayDecl? ;
+int funcArg()
+{
+	if(!typeBase())return 0;
+	if(!consume(ID)) tkerr(crtTk,"missing ID after type of argument");
+	arrayDecl();
+	return 1;
+}
+
+// handle a function declaration
+//declFunc: ( typeBase MUL? | VOID ) ID 
+//                       LPAR ( funcArg ( COMMA funcArg )* )? RPAR 
+//                       stmCompound ;
+int declFunc()
+{
+  startTk = crtTk;
+   //printf("Sunt aiciFUNC");
+	if(typeBase())
+	{
+		if(consume(MUL))
+		{
+			// do nothing if there is or not a MUL token
+		}
+	}else
+		if(!consume(VOID)) return 0;
+	
+	if(!consume(ID)) tkerr(crtTk,"missing ID after type of function");
+	if(!consume(LPAR)) { //tkerr(crtTk,"missing ( after the ID");
+	  crtTk=startTk;
+	  return 0;
+	}
+	
+	if(funcArg())
+	{
+		// do nothing if there is or not an argument
+		while(1)
+		{
+			if(!consume(COMMA))break;
+			if(!funcArg()) tkerr(crtTk,"missing argument after COMMA");
+		}
+	}
+	if(!consume(RPAR)) tkerr(crtTk,"missing ) at the end of function declaration");
+	stmCompound();
+	return 1;
+}
+
+// check the if correctness --> IF LPAR expr RPAR stm ( ELSE stm )?
+int ruleIf()
+{
+	if(!consume(IF))return 0;
+	if(!consume(LPAR))tkerr(crtTk,"missing ( after if");
+	if(!expr())tkerr(crtTk,"invalid expression after (");
+	if(!consume(RPAR))tkerr(crtTk,"missing )");
+	if(!stm())tkerr(crtTk,"missing if statement");
+	if(consume(ELSE))
+	{
+	if(!stm()) tkerr(crtTk,"missing else statement");
+	}	
+	return 1;
+}
+
+// check the while correctness --> WHILE LPAR expr RPAR stm
+int ruleWhile()
+{
+	if(!consume(WHILE))return 0;
+	if(!consume(LPAR))tkerr(crtTk,"missing ( after while");
+	if(!expr())tkerr(crtTk,"invalid expression after (");
+	if(!consume(RPAR))tkerr(crtTk,"missing )");
+	if(!stm())tkerr(crtTk,"missing while statement");
+	return 1;
+}
+
+
+// check the for correctness --> FOR LPAR expr? SEMICOLON expr? SEMICOLON expr? RPAR stm
+int ruleFor()
+{
+   printf("#rulefOR %d(%d)\n",crtTk->line,crtTk->code);
+	if(!consume(FOR))return 0;
+	if(!consume(LPAR))tkerr(crtTk,"missing ( after for");
+	
+	if(expr())
+	{
+		//while(expr());//it does nothing if there is or not an expr
+	}
+	
+	if(!consume(SEMICOLON))tkerr(crtTk,"missing ; after first expr");
+	
+	if(expr())
+	{
+		//it does nothing if there is or not an expr
+	}
+	
+	if(!consume(SEMICOLON))tkerr(crtTk,"missing ; after second expr");
+	
+	if(expr())
+	{
+		//it does nothing if there is or not an expr
+	}
+
+	if(!consume(RPAR))tkerr(crtTk,"missing )");
+	
+	if(!stm())tkerr(crtTk,"missing for statement");
+	return 1;
+}
+
+// check the break correctness --> BREAK SEMICOLON
+int ruleBreak()
+{
+   printf("#break %d(%d)\n",crtTk->line,crtTk->code);
+	if(!consume(BREAK))return 0;
+	if(!consume(SEMICOLON)) tkerr(crtTk,"missing ;");
+	return 1;
+}
+
+//check return correctness --> RETURN expr? SEMICOLON
+int ruleReturn()
+{
+   printf("#return %d(%d)\n",crtTk->line,crtTk->code);
+	if(!consume(RETURN))return 0;
+	expr();
+	if(!consume(SEMICOLON)) tkerr(crtTk,"missing ;");
+	return 1;
+}
+
+// handle expr --> expr: exprAssign ;
+int expr()
+{
+   printf("#expr %d(%d)\n",crtTk->line,crtTk->code);
+	if(!exprAssign())
+		return 0;
+	return 1;
+}
+
+//handle exprAssign --> exprAssign: exprUnary ASSIGN exprAssign | exprOr ;
+int exprAssign() 
+{
+   printf("#ass %d(%d)\n",crtTk->line,crtTk->code);
+  Token *start = crtTk;
+	if(exprUnary())  
+           if(consume(ASSIGN)) //tkerr(crtTk, "Expected ASSIGN after expression");
+            if(exprAssign()) //tkerr(crtTk, "Expected Expression in expression");
+            return 1;
+	   
+    crtTk = start;
+    if(!exprOr()){ return 0;}
+    return 1;
+}
+
+////handle exprOr --> exprOr: exprOr OR exprAnd | exprAnd
+					// Remove left recursion:
+					//     exprOr: exprAnd exprOr1
+					//     exprOr1: OR exprAnd exprOr1
+void exprOr1() 
+{
+   printf("#Or1 %d(%d)\n",crtTk->line,crtTk->code);
+    if(consume(OR)) {
+        if(!exprAnd()) 
+            {
+               // tkerr(crtTk,"missing expression after OR"); 
+            }
+        exprOr1();
+    }
+}
+
+int exprOr() 
+{
+   printf("#Or %d(%d)\n",crtTk->line,crtTk->code);
+    if(!exprAnd()) return 0;
+    exprOr1();
+    return 1;
+}
+
+
+
+// handle exprAnd --> exprAnd: exprAnd AND exprEq | exprEq
+						// Remove left recursion:
+						//     exprAnd: exprEq exprAnd1
+						//     exprAnd1: AND exprEq exprAnd1
+void exprAnd1()
+ {
+    printf("#and1 %d(%d)\n",crtTk->line,crtTk->code);
+    if(consume(AND)) {
+        if(!exprEq()) 
+            {
+                //tkerr(crtTk,"missing expression after AND"); 
+            }
+        exprAnd1();
+    }
+}
+
+int exprAnd()
+ {
+    printf("#and %d(%d)\n",crtTk->line,crtTk->code);
+    if(!exprEq()) return 0;
+    exprAnd1();
+    return 1;
+}
+
+
+
+// handle exprEq --> exprEq: exprEq ( EQUAL | NOTEQ ) exprRel | exprRel
+					// Remove left recursion:
+					//     exprEq: exprRel exprEq1
+					//     exprEq1: ( EQUAL | NOTEQ ) exprRel exprEq1
+void exprEq1() 
+{
+   printf("#eq1 %d(%d)\n",crtTk->line,crtTk->code);
+    if(consume(EQUAL)) {}
+    else if(consume(NOTEQ)) {}
+    else return;
+    if(!exprRel()) 
+        {
+        }//tkerr(crtTk,"missing expressiong after =");
+    exprEq1();
+}
+
+int exprEq()
+ {
+    printf("#eq %d(%d)\n",crtTk->line,crtTk->code);
+    if(!exprRel()) return 0;
+    exprEq1();
+    return 1;
+}
+
+
+
+// handle exprRel --> exprRel: exprRel ( LESS | LESSEQ | GREATER | GREATEREQ ) exprAdd | exprAdd
+					// Remove left recursion:
+					//     exprRel: exprAdd exprRel1
+					//     exprRel1: ( LESS | LESSEQ | GREATER | GREATEREQ ) exprAdd exprRel1
+void exprRel1() 
+{
+   printf("#exprrel1 %d(%d)\n",crtTk->line,crtTk->code);
+    if(consume(LESS)) {}
+    else if(consume(LESSEQ)) {}
+    else if(consume(GREATER)) {}
+    //else if(consume(GREATEREQ)) {}
+    else return;
+    if(!exprAdd())
+    {
+
+    }// tkerr(crtTk,"missing expression after relationship");
+    exprRel1();
+}
+
+int exprRel() 
+{
+   printf("#exprrel %d(%d)\n",crtTk->line,crtTk->code);
+    if(!exprAdd()) return 0;
+    exprRel1();
+    return 1;
+}
+
+
+
+//handle exprAdd --> exprAdd: exprAdd ( ADD | SUB ) exprMul | exprMul
+					// Remove left recursion:
+					//     exprAdd: exprMul exprAdd1
+					//     exprAdd1: ( ADD | SUB ) exprMul exprAdd1
+void exprAdd1()
+ {
+    printf("#expradd1 %d(%d)\n",crtTk->line,crtTk->code);
+    if(consume(ADD)) {}
+    else if(consume(SUB)) {}
+    else return;
+    if(!exprMul())
+    {
+
+    } //tkerr(crtTk,"missing expressiong after + or -");
+    exprAdd1();
+}
+
+int exprAdd() 
+{
+   printf("#expradd %d(%d)\n",crtTk->line,crtTk->code);
+    if(!exprMul()) return 0;
+    exprAdd1();
+    return 1;
+}
+
+
+
+//handle exprMul --> exprMul: exprMul ( MUL | DIV ) exprCast | exprCast
+					// Remove left recursion:
+					//     exprMul: exprCast exprMul1
+					//     exprMul1: ( MUL | DIV ) exprCast exprMul1
+void exprMul1() 
+{
+   printf("#mul1 %d(%d)\n",crtTk->line,crtTk->code);
+    if(consume(MUL)) {}
+    else if(consume(DIV)) {}
+    else return;
+    if(!exprCast())
+    {
+
+    } //tkerr(crtTk,"missing expressiong after * or /");
+    exprMul1();
+}
+
+int exprMul()
+ {
+    printf("#mul %d(%d)\n",crtTk->line,crtTk->code);
+    if(!exprCast()) return 0;
+    exprMul1();
+    return 1;
+}
+
+
+
+//handle exprCast --> exprCast: LPAR typeName RPAR exprCast | exprUnary
+int exprCast()
+ {
+    printf("#cast %d(%d)\n",crtTk->line,crtTk->code);
+   if(exprUnary()) return 1;
+    if(!consume(LPAR)) return 0;
+    if(!typeName()) tkerr(crtTk,"missing type after LPAR");
+
+    if(consume(RPAR)) tkerr(crtTk,"missing RPAR after type");
+    if(exprCast()) { return 1; }
+    
+	return 0;
+}
+
+//handle exprUnary --> exprUnary: ( SUB | NOT ) exprUnary | exprPostfix
+int exprUnary() 
+{
+    printf("#UNARY %d(%d)\n",crtTk->line,crtTk->code);
+  if(exprPostfix()) return 1;
+  
+    if(consume(SUB))
+      if(exprUnary()) return 1;
+    if(consume(NOT)) 
+      if(exprUnary()) return 1;
+	
+	return 0;
+    
+}
+
+//handle exprPostfix -->  exprPostfix: exprPostfix LBRACKET expr RBRACKET
+//            | exprPostfix DOT ID 
+//            | exprPrimary
+				// Remove left recursion:
+				//     exprPostfix: exprPrimary exprPostfix1
+				//     exprPostfix1: ( LBRACKET expr RBRACKET | DOT ID ) exprPostfix1
+void exprPostfix1() 
+{
+   printf("#postfix1 %d(%d)\n",crtTk->line,crtTk->code);
+    if(consume(LBRACKET)) {
+        if(!expr()) tkerr(crtTk,"missing expression after (");
+        if(!consume(RBRACKET)) tkerr(crtTk,"missing ) after expression");
+    } else if(consume(DOT)) {
+        if(!consume(ID)) tkerr(crtTk,"error");
+    } else return;
+    exprPostfix1();
+}
+
+int exprPostfix() 
+{
+   printf("#postfix %d(%d)\n",crtTk->line,crtTk->code);
+    if(!exprPrimary()) return 0;
+    exprPostfix1();
+    return 1;
+}
+
+
+
+// exprPrimary: ID ( LPAR ( expr ( COMMA expr )* )? RPAR )?
+//            | CT_INT
+//            | CT_REAL 
+//            | CT_CHAR 
+//            | CT_STRING 
+//            | LPAR expr RPAR
+int exprPrimary() 
+{
+  Token *startTk = crtTk;
+   printf("#exprPrimary %d(%d)\n",crtTk->line,crtTk->code);
+    if(consume(ID)) {
+	printf("id aici");
+        if(consume(LPAR)) {
+            if(expr()) {
+                while(1) {
+                    if(!consume(COMMA)) break;
+                    if(!expr()) tkerr(crtTk,"missing expression after , in primary expression");
+                }
+            }
+            if(!consume(RPAR)) tkerr(crtTk,"missing )");
+        }
+    }
+    else if(consume(CT_INT)) { }
+    else if(consume(CT_REAL)) {}
+    else if(consume(CT_CHAR)) {}
+    else if(consume(CT_STRING)) {}
+    else if(consume(LPAR)) {
+        if(!expr()) {
+	  tkerr(crtTk,"missing expr after (");
+        }
+        if(!consume(RPAR)) tkerr(crtTk,"missing ) after expression");
+    }
+    else {
+      crtTk = startTk;
+      return 0;
+    }
+    return 1;
+}
+
+int factor()
+{
+   printf("#factor %d(%d)\n",crtTk->line,crtTk->code);
+	Token *startTk=crtTk;
+	if(consume(ID))
+	{
+		return 1;
+	}
+	if(consume(CT_INT))
+	{
+		return 1;
+	}
+	if(consume(LPAR))
+	{
+		if(expr())
+		{
+			if(consume(RPAR))
+			{
+				return 1;
+			}else 
+				tkerr(crtTk,"missing )");
+		}else 
+			tkerr(crtTk,"invalid expression after (");
+		crtTk=startTk; // restore crtTk to the entry value
+	}
+	return 0;
+}
+
+
+
+int stmCompound()
+{
+   printf("#stmCmp %d(%d)\n",crtTk->line,crtTk->code);
+	if(!consume(LACC))return 0;
+	while(1)
+	{
+		if(declVar())
+		{
+		}
+		else 
+			if(stm())
+			{
+			}
+			else break;
+	}
+	if(!consume(RACC))tkerr(crtTk,"missing } or syntax error");
+	return 1;
+}
+
+int stm(){
+	Token *startTk=crtTk;
+	if(stmCompound())
+		return 1;
+	else
+	if(consume(IF))
+		{
+			if(consume(LPAR))
+			{
+				if(expr())
+				{
+					if(consume(RPAR))
+					{
+						if(stm())
+						{
+							if(consume(ELSE))
+							{
+								stm();
+							}
+							return 1;
+						}
+					}
+				}
+			}
+		}
+	else
+	if(consume(WHILE))
+		{
+			if(consume(LPAR))
+			{
+				if(expr())
+				{
+					if(consume(RPAR))
+					{
+						if(stm())
+						{
+							return 1;
+						}
+					}
+				}
+			}
+		}
+	else
+	if(consume(FOR))
+		{
+			if(consume(LPAR))
+				{
+					expr();
+					if(consume(SEMICOLON))
+					{
+						expr();
+						if(consume(SEMICOLON))
+						{
+							expr();
+							if(consume(RPAR))
+							{
+								if(stm())
+								{
+									return 1;
+								}
+							}
+						}
+					}
+				}
+			}
+	else
+	if(consume(BREAK))
+		{
+			if(consume(SEMICOLON))
+				{
+					return 1;
+				}
+		}
+	else
+	if(consume(RETURN))
+		{
+			expr();
+			if(consume(SEMICOLON))
+				{
+					return 1;
+				}
+		}
+	else
+		{
+			expr();
+			if(consume(SEMICOLON))
+				{
+					return 1;
+				}
+		}
+	crtTk=startTk;
+	return 0;
+}
+
+
 int main()
 {
     FILE* fis;
@@ -647,7 +1347,7 @@ int main()
     char* buff;
     int i = 0; //index
 
-    fis = fopen("8.c", "r");
+    fis = fopen("0.c", "r");
     if (fis == NULL) {
         printf("eroare deschidere fisier\n");
         exit(1);
@@ -677,6 +1377,12 @@ int main()
     while (getNextToken() != END) {}
 
     showTokens();
+    crtTk = tokens;
+    	if(unit()){
+		printf("sintaxa buna\n");
+	}else{
+		tkerr(crtTk,"eroare de sintaxa");
+	}
 
     return 0;
 }
